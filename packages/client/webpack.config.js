@@ -1,24 +1,22 @@
 const path = require('path')
 const { argv } = require('yargs')
-const HtmlWebpackPlugin = require('html-webpack-plugin')
-const DotenvWebpackPlugin = require('dotenv-webpack')
+const HTMLPlugin = require('html-webpack-plugin')
+const WorkerPlugin = require('worker-plugin')
+const Dotenv = require('dotenv-webpack')
 const { EnvironmentPlugin } = require('webpack')
 
-const outputPath = path.resolve(__dirname, 'dist')
-
 module.exports = {
-  mode: argv.develop ? 'development' : 'production',
   entry: './src/index.tsx',
-  resolve: {
-    extensions: ['.ts', '.tsx', '.js'],
-    modules: [path.resolve(__dirname, 'src'), 'node_modules'],
+  output: {
+    path: path.resolve(__dirname, 'dist'),
+    filename: 'bundle.js',
   },
-  devServer: {
-    open: true,
-    contentBase: outputPath,
-    historyApiFallback: true,
-    watchContentBase: true,
-    port: 3000,
+  resolve: {
+    extensions: ['.js', '.ts', '.tsx', '.json', '.mjs', '.wasm'],
+    modules: [path.resolve(__dirname, 'src'), 'node_modules'],
+    alias: {
+      src: path.resolve(__dirname, 'src'),
+    },
   },
   module: {
     rules: [
@@ -27,6 +25,9 @@ module.exports = {
         exclude: /node_modules/,
         use: [
           {
+            loader: 'babel-loader',
+          },
+          {
             loader: 'ts-loader',
             options: {
               transpileOnly: true,
@@ -34,17 +35,44 @@ module.exports = {
           },
         ],
       },
+      {
+        // cssファイルは自前で書かない(emotionを使う)が、animate.css等のcssライブラリを使うためにローダーを入れる
+        test: /.css$/,
+        include: /node_modules/,
+        use: [
+          'style-loader',
+          {
+            loader: 'css-loader',
+            options: {
+              modules: false,
+              url: true,
+              importLoaders: 1,
+            },
+          },
+        ],
+      },
+      {
+        test: /\.(gif|png|jpg|eot|wof|woff|ttf|svg)$/,
+        use: [
+          {
+            loader: 'url-loader',
+            options: {
+              limit: 100 * 1024,
+              name: './img/[name].[ext]',
+            },
+          },
+        ],
+      },
     ],
   },
   plugins: [
-    new HtmlWebpackPlugin({ template: './src/index.html' }),
-    argv.develop
-      ? new DotenvWebpackPlugin()
+    new HTMLPlugin({
+      template: path.join(__dirname, 'src/index.html'),
+    }),
+
+    new WorkerPlugin(),
+    argv.mode === 'development'
+      ? new Dotenv({ path: path.join(__dirname, '.env') })
       : new EnvironmentPlugin(Object.keys(process.env)),
   ],
-  output: {
-    filename: 'index.js',
-    path: outputPath,
-    publicPath: '/',
-  },
 }
